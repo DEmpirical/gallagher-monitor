@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "3001:3001"
+    environment:
+      - GALLAGHER_HOST=${GALLAGHER_HOST}
+      - GALLAGHER_API_KEY=${GALLAGHER_API_KEY}
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN:-change-me}
+      - ALLOWED_ORIGINS=http://localhost:5173
+    volumes:
+      - ./backend/.env:/app/.env
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:4173"  # Vite preview or built nginx
+    environment:
+      - VITE_INTERNAL_TOKEN=${INTERNAL_TOKEN:-change-me}
+    depends_on:
+      - backend
+    restart: unless-stopped
