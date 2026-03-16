@@ -29,6 +29,11 @@ const DEFAULT_CONFIG: AppConfig = {
   },
 };
 
+function parseBool(val?: string, fallback: boolean = false): boolean {
+  if (!val) return fallback;
+  return val === 'true' || val === '1' || val === 'yes';
+}
+
 class ConfigService {
   private config: AppConfig;
   private configPath: string;
@@ -40,18 +45,15 @@ class ConfigService {
 
   getHttpsAgent(): https.Agent | undefined {
     const cfg = this.config.gallagher;
-    // Solo usamos agent para HTTPS
-    // Si no es HTTPS, devolvemos undefined (fetch usará default)
     if (!cfg.host.startsWith('https://')) {
       return undefined;
     }
 
     const agentOptions: https.RequestOptions = {};
 
-    // 1) Certificado cliente desde store de Windows (solo Windows)
+    // Certificado cliente desde store de Windows (solo win32)
     if (cfg.clientCertThumbprint && process.platform === 'win32') {
       try {
-        // Instalar win-ca: npm install win-ca
         const { Store } = require('win-ca');
         const store = new Store();
         const certs = store.findSync({ thumbprint: cfg.clientCertThumbprint });
@@ -59,7 +61,6 @@ class ConfigService {
           throw new Error(`Certificado no encontrado en store: ${cfg.clientCertThumbprint}`);
         }
         const cert = certs[0];
-        // Convertir a PEM
         agentOptions.cert = cert.toPEM();
         if (cert.privateKey) {
           agentOptions.key = cert.privateKey.toPEM();
@@ -68,11 +69,10 @@ class ConfigService {
         }
       } catch (error: any) {
         logger.error('Error cargando certificado desde Windows store', { error: error.message });
-        // No lanzamos error aquí, podríamos continuar sin cert si Gallagher no lo requiere
       }
     }
 
-    // 2) Configurar validación de certificado del servidor
+    // Validación de certificado del servidor
     const ignore = cfg.ignoreSsl || !cfg.strictSsl;
     agentOptions.rejectUnauthorized = !ignore;
 
@@ -81,12 +81,28 @@ class ConfigService {
 
   private load(): AppConfig {
     try {
+      // Fusionar defaults, .env, y config.json
+      const merged: any = { ...DEFAULT_CONFIG };
+
+      // 1) Cargar config.json si existe
       if (fs.existsSync(this.configPath)) {
         const raw = fs.readFileSync(this.configPath, 'utf8');
         const parsed = JSON.parse(raw);
-        // Merge con defaults
-        return { ...DEFAULT_CONFIG, ...parsed, gallagher: { ...DEFAULT_CONFIG.gallagher, ...parsed.gallagher } };
+        merged.gallagher = { ...DEFAULT_CONFIG.gallagher, ...parsed.gallagher };
       }
+
+      // 2) Aplicar variables de entorno como overrides (para desarrollo)
+      if (process.env.GALLAGHER_HOST) merged.gallagher.host = process.env.GALLAGHER_HOST;
+      if (process.env.GALLAGHER_PORT) merged.gallagher.port = parseInt(process.env.GALLAGHER_PORT, 10);
+      if (process.env.GALLAGHER_API_KEY) merged.gallagher.apiKey = process.env.GALLAGHER_API_KEY;
+      if (process.env.GALLAGHER_CLIENT_CERT_THUMBPRINT) merged.gallagher.clientCertThumbprint = process.env.GALLAGHER_CLIENT_CERT_THUMBPRINT;
+      if (process.env.GALLAGHER_IGNORE_SERVER_CERT !== undefined) merged.gallagher.ignoreSsl = parseBool(process.env.GALLAGHER_IGNORE_SERVER_CERT);
+      if (process.env.GALLAGHER_STRICT_SSL !== undefined) merged.gallagher.strictSsl = parseBool(process.env.GALLAGHER_STRICT_SSL);
+      if (process.env.GALLAGHER_TIMEOUT) merged.gallagher.timeout = parseInt(process.env.GALLAGHER_TIMEOUT, 10);
+      if (process.env.GALLAGHER_POLL_INTERVAL) merged.gallagher.pollInterval = parseInt(process.env.GALLAGHER_POLL_INTERVAL, 10);
+      if (process.env.GALLAGHER_DEFAULT_FIELDS) merged.gallagher.defaultFields = process.env.GALLAGHER_DEFAULT_FIELDS;
+
+      return merged as AppConfig;
     } catch (error: any) {
       logger.error('Failed to load config', { error: error.message });
     }
