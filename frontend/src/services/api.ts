@@ -1,20 +1,19 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: 'http://localhost:3001/api',
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Set internal token after reading from env
 const INTERNAL_TOKEN = import.meta.env.VITE_INTERNAL_TOKEN;
 if (INTERNAL_TOKEN) {
   api.defaults.headers.common['X-Internal-Token'] = INTERNAL_TOKEN;
 }
 
 export interface AlarmsResponse {
-  alarms: any[]; // TODO: replace with AlarmRecord
+  alarms: any[];
   cursor?: any;
 }
 
@@ -39,3 +38,5 @@ export const healthApi = {
   backend: () => api.get('/health'),
   gallagher: () => api.get('/health/gallagher'),
 };
+
+export { api };
