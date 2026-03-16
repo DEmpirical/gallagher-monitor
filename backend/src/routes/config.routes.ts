@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { configService } from '../services/config.service';
 import { internalAuth } from '../middleware/auth';
 import { GallagherClient } from '../clients/gallagher.client';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -68,6 +69,7 @@ router.post('/test', internalAuth, async (req: Request, res: Response) => {
     const apiRoot = await client.getApiRoot();
     res.json({ success: true, message: 'Conexión exitosa', links: apiRoot._links });
   } catch (error: any) {
+    logger.error('Config test failed', { error: error.message, stack: error.stack });
     res.status(500).json({ success: false, error: error.message });
   }
 });
