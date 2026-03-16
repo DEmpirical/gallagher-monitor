@@ -65,6 +65,18 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
       setError('Host y API Key son obligatorios');
       return;
     }
+    // Validar formato de host como URL
+    try {
+      new URL(config.host);
+    } catch {
+      setError('Host debe ser una URL válida (ej: https://servidor:8443)');
+      return;
+    }
+    // Validar prefijo API Key
+    if (!payloadApiKey.startsWith('GGL-API-KEY')) {
+      setError('API Key debe comenzar con "GGL-API-KEY"');
+      return;
+    }
     setTesting(true);
     setError(null);
     setMessage(null);
@@ -96,6 +108,18 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
     }
     if (!apiKeyInput && !existingApiKeyMasked) {
       setError('API Key es obligatoria');
+      return;
+    }
+    // Validar host URL
+    try {
+      new URL(config.host);
+    } catch {
+      setError('Host debe ser una URL válida (ej: https://servidor:8443)');
+      return;
+    }
+    // Validar API Key formato (si se está cambiando)
+    if (apiKeyInput && !apiKeyInput.startsWith('GGL-API-KEY')) {
+      setError('API Key debe comenzar con "GGL-API-KEY"');
       return;
     }
     setLoading(true);
@@ -138,15 +162,18 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Host (URL)</label>
+            <label className="block text-sm font-medium text-gray-700">Host / Base URL</label>
             <input
               type="text"
               name="host"
               value={config.host}
               onChange={handleChange}
-              placeholder="https://gallagher-server:8443"
+              placeholder="https://192.168.1.78:8443"
               className="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Incluye https:// y puerto si es necesario.
+            </p>
           </div>
 
           <div>
@@ -168,9 +195,12 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
               name="apiKey"
               value={apiKeyInput}
               onChange={(e) => setApiKeyInput(e.target.value)}
-              placeholder={existingApiKeyMasked ? 'Dejar vacío para mantener la actual' : 'GGL-API-KEY o token'}
+              placeholder={existingApiKeyMasked ? 'Dejar vacío para mantener la actual' : 'GGL-API-KEY-...'}
               className="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Debe comenzar con "GGL-API-KEY". Se almacena encriptada en el backend.
+            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -181,7 +211,12 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
               onChange={handleChange}
               className="rounded border-gray-300"
             />
-            <label className="text-sm font-medium text-gray-700">Validar certificado SSL</label>
+            <label className="text-sm font-medium text-gray-700">
+              Validar certificados HTTPS/TLS
+            </label>
+            <span className="text-xs text-gray-500">
+              (Desactivar para certificados autofirmados)
+            </span>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -227,14 +262,14 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
         <div className="mt-6 flex items-center gap-3">
           <button
             onClick={testConnection}
-            disabled={testing || !config.host}
+            disabled={testing || !config.host || (!apiKeyInput && !existingApiKeyMasked)}
             className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50"
           >
             {testing ? 'Probando...' : '🔗 Probar conexión'}
           </button>
           <button
             onClick={saveConfig}
-            disabled={loading || !config.host}
+            disabled={loading || !config.host || (!apiKeyInput && !existingApiKeyMasked)}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
           >
             {loading ? 'Guardando...' : '💾 Guardar configuración'}
@@ -246,4 +281,3 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
 };
 
 export default ConfigPage;
-

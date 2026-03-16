@@ -18,12 +18,14 @@ Aplicación de monitorización en tiempo real de alarmas y eventos para Gallaghe
 - Diseño responsive y profesional
 - **Ventana de configuración** para host, API key, SSL, timeout, polling interval, fields
 - Seguridad: API key de Gallagher nunca se expone al navegador
+- Validación de formato de API Key (debe empezar con `GGL-API-KEY`)
+- Control de validación TLS (checkbox para aceptar certificados autofirmados)
 
 ## Requisitos
 
 - Node.js 18+
 - Gallagher Command Centre con licencias RESTEvents (y RESTCreateEvents si se crearán eventos)
-- API Key generada en Command Centre (REST Client item)
+- API Key generada en Command Centre (REST Client item) — formato: `GGL-API-KEY-XXXXX`
 
 ## Configuración rápida
 
@@ -33,8 +35,7 @@ Aplicación de monitorización en tiempo real de alarmas y eventos para Gallaghe
 cd backend
 cp .env.example .env
 # Editar .env con:
-# GALLAGHER_HOST=https://tu-gallagher:8443
-# GALLAGHER_API_KEY=tu-api-key
+# GALLAGHER_HOST= (no se usa, se configura por UI)
 # INTERNAL_TOKEN=secreto-compartido-con-frontend
 npm install
 npm run dev
@@ -56,26 +57,44 @@ Frontend corre en `http://localhost:5173`.
 
 ### 3. Configuración inicial (vía UI)
 
-- Al abrir la app por primera vez, se muestra la pantalla de configuración.
-- Ingresa:
-  - Host de Gallagher
-  - API Key
-  - Validación SSL (según tu entorno)
-  - Timeout e intervalo de polling
-  - Campos por defecto para eventos
-- Click "🔗 Probar conexión" para validar.
-- Click "💾 Guardar configuración".
-- La app guarda la configuración en `backend/config.json` (archivo ignorado por git).
+Al abrir la app por primera vez, se muestra la pantalla de configuración.
 
-**Nota:** La API Key se almacena en texto plano en `config.json`. Para entornos de producción, se recomienda cifrar este archivo o usar un vault. La estructura está lista para añadir cifrado.
+**Campos:**
+
+- **Host / Base URL**: URL completa del servidor Gallagher. Ej: `https://192.168.1.78:8443`. Debe incluir `https://` y puerto si aplica. Se valida como URL.
+- **API Key**: Clave de API generada en Command Centre. **Debe comenzar con `GGL-API-KEY`**. Si no, no se permite guardar.
+- **Validar certificados HTTPS/TLS**: 
+  - Activado (predeterminado): se validan los certificados del servidor (producción).
+  - Desactivado: se permiten certificados autofirmados (entornos de prueba).
+- **Timeout (ms)**: Tiempo máximo de espera en peticiones a Gallagher (default 30000).
+- **Polling interval (ms)**: Intervalo entre consultas de actualizaciones (default 15000).
+- **Default fields**: Campos solicitados por defecto para eventos (separados por coma).
+
+**Botones:**
+
+- **🔗 Probar conexión**: Valida host, formato API key y conectividad con Gallagher (GET `/api`). No guarda.
+- **💾 Guardar configuración**: Guarda la configuración en `backend/config.json`. Si la API key es correcta y la conexión funciona, se redirige al dashboard.
+
+**Comportamiento:**
+
+- Si faltan campos obligatorios o el formato es incorrecto, se muestra error claro.
+- La API Key **nunca** se muestra completa después de guardar; se enmascara (ej: `GGL-API-KEY••••••••••`).
+- El frontend consulta `GET /api/config` al iniciar; si `isConfigured` es `false`, se redirige automáticamente a la pantalla de configuración.
+
+**Persistencia:**
+
+- La configuración se guarda en `backend/config.json` (archivo ignorado por git).
+- Permisos recomendados: `chmod 600 config.json`.
+- Para producción, considerar cifrado del campo `apiKey`. La estructura está lista para añadir cifrado.
 
 ## Flujo de configuración
 
-1. Si no hay configuración guardada, la app redirige automáticamente a la pantalla de configuración.
-2. El usuario completa y prueba la conexión.
-3. Al guardar, el backend escribe `config.json` (en el directorio de trabajo del backend).
-4. El frontend detecta `isConfigured=true` y muestra el dashboard.
-5. Si cambias la configuración, los servicios de polling se reinician automáticamente al recargar.
+1. Usuario ingresa host y API key (con formato correcto).
+2. Opcional: desactiva "Validar certificados" si usa certificados autofirmados.
+3. Click "Probar conexión" → valida credentials y conectividad.
+4. Si éxito, click "Guardar configuración" → backend escribe `config.json`.
+5. Frontend detecta `isConfigured=true` y muestra dashboard.
+6. Si se modifica la configuración, los servicios de polling usan los nuevos valores automáticamente (config dinámica).
 
 ## Endpoints API
 
@@ -83,16 +102,16 @@ Frontend corre en `http://localhost:5173`.
 
 ### Configuración
 
-- `GET /api/config` — obtiene configuración actual (apiKey enmascarada)
-- `POST /api/config` — guarda configuración (solo campos proporcionados)
-- `POST /api/config/test` — prueba conexión sin guardar
-- `DELETE /api/config` — limpia configuración
+- `GET /api/config` — obtiene configuración actual (`apiKey` enmascarada, `isConfigured`)
+- `POST /api/config` — guarda configuración (parcial). Solo actualiza campos enviados.
+- `POST /api/config/test` — prueba conexión **sin guardar**. Valida host, API key (formato `GGL-API-KEY`) y conectividad.
+- `DELETE /api/config` — limpia configuración (elimina `config.json`).
 
 ### Alarmas
 
 - `GET /api/alarms` — carga inicial de alarmas activas
 - `GET /api/alarms/updates` — long-poll para nuevas/actualizadas alarmas
-- `POST /api/alarms/:id/acknowledge` — recognecer alarma
+- `POST /api/alarms/:id/acknowledge` — reconocer alarma
 - `POST /api/alarms/:id/clear` — silenciar/clear alarma
 
 ### Eventos
@@ -106,42 +125,6 @@ Frontend corre en `http://localhost:5173`.
 - `GET /health` — health del backend
 - `GET /health/gallagher` — conectividad con Gallagher
 
-## Filtros de eventos soportados
-
-Consulta los parámetros que Gallagher acepta en `GET /api/events`:
-
-- `group`, `type`, `cardholder`, `division`, `directDivision`
-- `relatedItem`, `source`, `after`, `before`
-- `top`, `fields`
-
-Ejemplo: `/api/events?division=123&after=2025-01-01T00:00:00Z&fields=defaults,source,eventType`
-
-## Estructura de carpetas
-
-```
-gallagher-monitor/
-├── backend/
-│   ├── src/
-│   │   ├── clients/      # Cliente Gallagher
-│   │   ├── config/       # Configuración (env)
-│   │   ├── middleware/   # Auth, errors
-│   │   ├── routes/       # API routes
-│   │   ├── services/     # Lógica de negocio
-│   │   └── utils/        # Logger, etc.
-│   └── ...
-├── frontend/
-│   ├── src/
-│   │   ├── components/   # UI components
-│   │   ├── hooks/        # Custom hooks
-│   │   ├── pages/        # ConfigPage, etc.
-│   │   ├── services/     # API client
-│   │   ├── store/        # Zustand store
-│   │   └── types/        # TypeScript types
-│   └── ...
-├── README.md
-└── ARCHITECTURE.md
-```
-
 ## Modelo de configuración
 
 Almacenado en `backend/config.json` (generado automáticamente):
@@ -150,7 +133,7 @@ Almacenado en `backend/config.json` (generado automáticamente):
 {
   "gallagher": {
     "host": "https://gallagher-server:8443",
-    "apiKey": "tu-api-key-aquí",
+    "apiKey": "GGL-API-KEY-...",
     "strictSsl": true,
     "timeout": 30000,
     "pollInterval": 15000,
@@ -159,10 +142,11 @@ Almacenado en `backend/config.json` (generado automáticamente):
 }
 ```
 
-**Seguridad:**
-- El archivo `config.json` debe tener permisos restringidos (chmod 600).
-- En producción, considera cifrar el campo `apiKey`.
-- El backend expone solo la versión enmascarada (`apiKeyMasked`) en `GET /api/config`.
+**Validaciones aplicadas:**
+
+- `host`: debe ser URL válida (con `https://`).
+- `apiKey`: debe comenzar con `GGL-API-KEY`.
+- `strictSsl`: controla validación TLS (true=validar, false=aceptar autofirmados).
 
 ## Seguridad
 
@@ -170,6 +154,7 @@ Almacenado en `backend/config.json` (generado automáticamente):
 - El frontend usa `X-Internal-Token` para autenticarse contra el proxy.
 - CORS restringido a orígenes configurados en `ALLOWED_ORIGINS`.
 - Logs no capturan secretos.
+- TLS: el backend respeta `strictSsl` usando `https.Agent` con `rejectUnauthorized`.
 
 ## Personalización de polling
 
@@ -185,16 +170,20 @@ Estos valores se pueden cambiar desde la UI y se guardan en `config.json`.
 - Usar HTTPS delante del backend (nginx, cloud load balancer)
 - Considerar rate limiting
 - Habilitar logs en nivel `info` o `warn` (no `debug`)
-- Compilar con `npm run build` y ejecutar con `node dist/index.js`
+- Compilar backend: `npm run build` y ejecutar con `node dist/index.js`
+- Compilar frontend: `npm run build` y servir con nginx
 - Usar process manager (PM2, systemd)
-- Asegurar que `config.json` esté protegido
+- Asegurar que `config.json` esté protegido (chmod 600)
+- Plantéase usar un vault (HashiCorp Vault, AWS Secrets Manager) para `apiKey`
 
 ## Troubleshooting
 
-- **401 de Gallagher**: Verificar API key y permisos del REST Client en Command Centre.
+- **401 de Gallagher**: Verificar API key, formato GGL-API-KEY y permisos del REST Client en Command Centre.
 - **CORS error**: Añadir origen del frontend a `ALLOWED_ORIGINS` en backend `.env`.
 - **Sin updates**: Verificar licencia RESTEvents y versión CC (>=8.50 recomendado).
-- **Timeouts**: Ajustar `REQUEST_TIMEOUT_MS` y `POLL_INTERVAL_MS` en backend `.env`.
+- **Timeouts**: Ajustar `timeout` y `pollInterval` desde la UI o `config.json`.
+- **Error "Host debe ser una URL válida"**: Asegúrate de incluir `https://` y puerto.
+- **Error "API Key debe comenzar con GGL-API-KEY"**: Revisa que la clave no haya sido recortada o mal copiada.
 - **Configuración no persistida**: Verificar permisos de escritura en directorio de `config.json`.
 
 ## Mejoras futuras
@@ -206,7 +195,7 @@ Estos valores se pueden cambiar desde la UI y se guardan en `config.json`.
 - Alertas por Telegram/email
 - Gráficos y métricas
 - Ajuste automático de `top` basado en volumen
-- Cifrado de API key en `config.json`
+- Cifrado de API key en `config.json` (por ejemplo, con `crypto` y master password)
 
 ## Licencia
 

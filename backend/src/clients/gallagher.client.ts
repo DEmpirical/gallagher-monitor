@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import https from 'https';
 import { configService } from '../services/config.service';
 import {
   GallagherAlarmResponse,
@@ -27,6 +28,10 @@ export class GallagherClient {
     return cfg.host.replace(/\/$/, '');
   }
 
+  private getAgent(): https.Agent {
+    return configService.getHttpsAgent();
+  }
+
   private async fetchJson<T>(url: string, init: fetch.RequestInit = {}): Promise<T> {
     const baseUrl = this.getBaseUrl();
     const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
@@ -41,6 +46,7 @@ export class GallagherClient {
           ...this.getHeaders(),
           ...(init.headers || {}),
         },
+        agent: this.getAgent(),
         signal: controller.signal,
       });
 
@@ -155,7 +161,6 @@ export class GallagherClient {
         qs.append(k, String(v));
       }
     });
-    // Usar defaultFields si no se especifica fields
     if (!params.fields) {
       qs.append('fields', cfg.defaultFields);
     }

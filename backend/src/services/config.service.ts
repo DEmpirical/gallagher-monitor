@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import * as https from 'https';
 import { logger } from '../utils/logger';
 
 export interface AppConfig {
@@ -7,8 +8,8 @@ export interface AppConfig {
     host: string;
     apiKey: string;
     strictSsl: boolean;
-    timeout: number; // ms
-    pollInterval: number; // ms
+    timeout: number;
+    pollInterval: number;
     defaultFields: string;
   };
 }
@@ -29,9 +30,15 @@ class ConfigService {
   private configPath: string;
 
   constructor() {
-    // Usar un archivo de configuración en el workspace del backend
     this.configPath = process.env.CONFIG_PATH || path.resolve(process.cwd(), 'config.json');
     this.config = this.load();
+  }
+
+  getHttpsAgent(): https.Agent {
+    const cfg = this.config.gallagher;
+    return new https.Agent({
+      rejectUnauthorized: cfg.strictSsl,
+    });
   }
 
   private load(): AppConfig {
@@ -39,7 +46,6 @@ class ConfigService {
       if (fs.existsSync(this.configPath)) {
         const raw = fs.readFileSync(this.configPath, 'utf8');
         const parsed = JSON.parse(raw);
-        // Merge with defaults to ensure completeness
         return { ...DEFAULT_CONFIG, ...parsed, gallagher: { ...DEFAULT_CONFIG.gallagher, ...parsed.gallagher } };
       }
     } catch (error: any) {
@@ -59,11 +65,16 @@ class ConfigService {
   }
 
   getConfig(): AppConfig {
-    // Return a copy to avoid mutation outside
     return JSON.parse(JSON.stringify(this.config));
   }
 
   updateConfig(partial: Partial<AppConfig>): AppConfig {
+    if (partial.gallagher?.apiKey) {
+      this.validateApiKey(partial.gallagher.apiKey);
+    }
+    if (partial.gallagher?.host) {
+      this.validateHost(partial.gallagher.host);
+    }
     if (partial.gallagher) {
       this.config.gallagher = { ...this.config.gallagher, ...partial.gallagher };
     }
@@ -72,7 +83,20 @@ class ConfigService {
     return this.getConfig();
   }
 
-  // Returns masked config (apiKey partially hidden)
+  private validateApiKey(apiKey: string) {
+    if (!apiKey.startsWith('GGL-API-KEY')) {
+      throw new Error('API Key must start with "GGL-API-KEY"');
+    }
+  }
+
+  private validateHost(host: string) {
+    try {
+      new URL(host);
+    } catch {
+      throw new Error('Host must be a valid URL (include https://)');
+    }
+  }
+
   getMaskedConfig(): Omit<AppConfig, 'gallagher'> & { gallagher: Omit<AppConfig['gallagher'], 'apiKey'> & { apiKeyMasked: string } } {
     const cfg = this.getConfig();
     const mask = (s: string) => s.length > 8 ? `${'*'.repeat(s.length - 4)}${s.slice(-4)}` : '****';

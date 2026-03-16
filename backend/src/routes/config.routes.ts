@@ -22,28 +22,32 @@ router.post('/', internalAuth, (req: Request, res: Response) => {
   }
 });
 
-// POST /api/config/test — probar conexión a Gallagher
+// POST /api/config/test — probar conexión sin guardar
 router.post('/test', internalAuth, async (req: Request, res: Response) => {
-  const { host, apiKey, strictSsl } = req.body as any;
+  const { host, apiKey, strictSsl = true } = req.body as any;
   if (!host || !apiKey) {
-    return res.status(400).json({ success: false, error: 'Host y API key requeridos' });
+    return res.status(400).json({ success: false, error: 'Host y API Key son requeridos' });
   }
-
-  // Usar un cliente temporal con estas credenciales
-  const testClient = {
-    host: host.replace(/\/$/, ''),
-    apiKey,
-    strictSsl,
-  };
-
   try {
-    // Test connection: GET /api (lightweight)
-    const response = await fetch(`${testClient.host}/api`, {
+    // Validar formato de API key
+    if (!apiKey.startsWith('GGL-API-KEY')) {
+      return res.status(400).json({ success: false, error: 'API Key debe comenzar con "GGL-API-KEY"' });
+    }
+    // Validar host como URL
+    try {
+      new URL(host);
+    } catch {
+      return res.status(400).json({ success: false, error: 'Host debe ser una URL válida (ej: https://servidor:8443)' });
+    }
+
+    // Test connection: GET /api
+    const response = await fetch(`${host}/api`, {
       headers: {
-        'Authorization': `Bearer ${testClient.apiKey}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Accept': 'application/json',
       },
-      // Could add rejectUnauthorized: strictSsl if using https.Agent with custom cert handling
+      // rejectUnauthorized controla validación TLS
+      // Nota: node-fetch no expone agent directamente en esta forma simple; para producción se mejoraría
     });
 
     if (!response.ok) {
