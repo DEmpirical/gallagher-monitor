@@ -97,6 +97,13 @@ export class GallagherClient {
     }
 
     const agentOptions: https.RequestOptions = {};
+    logger.debug('Building HTTPS agent', { 
+      host: baseUrl, 
+      ignoreSsl: cfg.ignoreSsl, 
+      strictSsl: cfg.strictSsl,
+      clientCertThumbprint: cfg.clientCertThumbprint,
+      platform: process.platform
+    });
 
     // 1) Certificado cliente desde store de Windows (solo win32)
     if (cfg.clientCertThumbprint && process.platform === 'win32') {
@@ -114,6 +121,7 @@ export class GallagherClient {
         } else {
           logger.warn('Certificado encontrado pero sin clave privada');
         }
+        logger.debug('Client certificate loaded', { subject: cert.subject });
       } catch (error: any) {
         logger.error('Error cargando certificado desde Windows store', { error: error.message });
         // Si falla, continuamos sin certificado (puede que no sea requerido)
@@ -123,6 +131,12 @@ export class GallagherClient {
     // 2) Configurar validación de certificado del servidor
     const ignore = cfg.ignoreSsl || !cfg.strictSsl;
     agentOptions.rejectUnauthorized = !ignore;
+    logger.debug('Agent options', { 
+      rejectUnauthorized: agentOptions.rejectUnauthorized, 
+      ignore: ignore,
+      strictSsl: cfg.strictSsl,
+      ignoreSsl: cfg.ignoreSsl
+    });
 
     return new https.Agent(agentOptions);
   }
