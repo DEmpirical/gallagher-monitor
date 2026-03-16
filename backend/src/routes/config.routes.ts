@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { configService } from '../services/config.service';
 import { internalAuth } from '../middleware/auth';
+import { GallagherClient } from '../clients/gallagher.client';
 
 const router = Router();
 
@@ -24,9 +25,9 @@ router.post('/', internalAuth, (req: Request, res: Response) => {
 
 // POST /api/config/test — probar conexión sin guardar
 router.post('/test', internalAuth, async (req: Request, res: Response) => {
-  const { host, apiKey, strictSsl = true } = req.body as any;
+  const { host, port, apiKey, ignoreSsl } = req.body as any;
   if (!host || !apiKey) {
-    return res.status(400).json({ success: false, error: 'Host y API Key son requeridos' });
+    return res.status(400).json({ success: false, error: 'Host, puerto y API Key son requeridos' });
   }
   try {
     // Validar formato de API key
@@ -39,24 +40,26 @@ router.post('/test', internalAuth, async (req: Request, res: Response) => {
     } catch {
       return res.status(400).json({ success: false, error: 'Host debe ser una URL válida (ej: https://servidor:8443)' });
     }
-
-    // Test connection: GET /api
-    const response = await fetch(`${host}/api`, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Accept': 'application/json',
-      },
-      // rejectUnauthorized controla validación TLS
-      // Nota: node-fetch no expone agent directamente en esta forma simple; para producción se mejoraría
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      return res.status(400).json({ success: false, error: `HTTP ${response.status}: ${response.statusText} - ${text}` });
+    // Validar puerto numérico
+    const portNum = parseInt(port);
+    if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
+      return res.status(400).json({ success: false, error: 'Puerto debe ser un número entre 1 y 65535' });
     }
 
-    const data = await response.json();
-    res.json({ success: true, message: 'Conexión exitosa', links: data._links });
+    // Crear cliente temporal con la configuración de prueba
+    const testConfig = {
+      host,
+      port: portNum,
+      apiKey,
+      strictSsl: !ignoreSsl,
+      ignoreSsl: !!ignoreSsl,
+      timeout: 30000,
+    };
+    const client = new GallagherClient(testConfig);
+
+    // Test connection: GET /api
+    const apiRoot = await client.getApiRoot();
+    res.json({ success: true, message: 'Conexión exitosa', links: apiRoot._links });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
