@@ -6,6 +6,7 @@ import { alarmsRouter } from './routes/alarms.routes';
 import { eventsRouter } from './routes/events.routes';
 import { configRouter } from './routes/config.routes';
 import { healthRouter } from './routes/health.routes';
+import { internalAuth } from './middleware/auth';
 import { errorHandler } from './middleware/error-handler';
 
 validateConfig();
