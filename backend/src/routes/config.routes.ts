@@ -65,9 +65,14 @@ router.post('/test', internalAuth, async (req: Request, res: Response) => {
     };
     const client = new GallagherClient(testConfig);
 
-    // Test connection: GET /api
-    const apiRoot = await client.getApiRoot();
-    res.json({ success: true, message: 'Conexión exitosa', links: apiRoot._links });
+    // Test connection: GET /api/events?limit=1 (ligero)
+    const testResponse = await client.getEvents({ limit: 1 });
+    res.json({ 
+      success: true, 
+      message: 'Conexión exitosa', 
+      eventsFetched: testResponse.events.length,
+      nextAvailable: !!testResponse.nextHref
+    });
   } catch (error: any) {
     logger.error('Config test failed', { error: error.message, stack: error.stack });
     res.status(500).json({ success: false, error: error.message });
