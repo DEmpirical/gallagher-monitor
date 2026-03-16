@@ -26,7 +26,7 @@ router.post('/', internalAuth, (req: Request, res: Response) => {
 
 // POST /api/config/test — probar conexión sin guardar
 router.post('/test', internalAuth, async (req: Request, res: Response) => {
-  const { host, port, apiKey, ignoreSsl } = req.body as any;
+  const { host, port, apiKey } = req.body as any;
   if (!host || !apiKey) {
     return res.status(400).json({ success: false, error: 'Host, puerto y API Key son requeridos' });
   }
@@ -47,20 +47,18 @@ router.post('/test', internalAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Puerto debe ser un número entre 1 y 65535' });
     }
 
-    // Obtener configuración actual para valores que no se envían en el test (ej: clientCertThumbprint)
+    // Obtener configuración actual (incluye strictSsl, ignoreSsl, clientCertThumbprint, timeout)
     const currentConfig = configService.getConfig();
 
     // Crear cliente temporal con la configuración de prueba
+    // Usa la misma configuración TLS que el backend (currentConfig.gallagher) pero con host/port/apiKey nuevos
     const testConfig = {
       gallagher: {
+        ...currentConfig.gallagher,
         host,
         port: portNum,
         apiKey,
-        strictSsl: false,  // forzar SSL no estricto
-        ignoreSsl: !!ignoreSsl, // usar valor del checkbox
-        clientCertThumbprint: currentConfig.gallagher.clientCertThumbprint,
-        timeout: 30000,
-        // defaultFields no es necesario para el test
+        timeout: 10000, // timeout corto para test
       }
     };
     const client = new GallagherClient(testConfig);
