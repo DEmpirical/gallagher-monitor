@@ -46,14 +46,21 @@ router.post('/test', internalAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Puerto debe ser un número entre 1 y 65535' });
     }
 
+    // Obtener configuración actual para valores que no se envían en el test (ej: clientCertThumbprint)
+    const currentConfig = configService.getConfig();
+
     // Crear cliente temporal con la configuración de prueba
     const testConfig = {
-      host,
-      port: portNum,
-      apiKey,
-      strictSsl: !ignoreSsl,
-      ignoreSsl: !!ignoreSsl,
-      timeout: 30000,
+      gallagher: {
+        host,
+        port: portNum,
+        apiKey,
+        strictSsl: !ignoreSsl,
+        ignoreSsl: !!ignoreSsl,
+        clientCertThumbprint: currentConfig.gallagher.clientCertThumbprint,
+        timeout: 30000,
+        // defaultFields no es necesario para el test
+      }
     };
     const client = new GallagherClient(testConfig);
 

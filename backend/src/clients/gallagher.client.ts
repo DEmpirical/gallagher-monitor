@@ -10,8 +10,25 @@ import {
 import { logger } from '../utils/logger';
 
 export class GallagherClient {
+  private getConfigFn: () => { gallagher: any };
+  private staticConfig: { gallagher: any } | null = null;
+
+  constructor(configOrGetConfig?: (() => { gallagher: any }) | { gallagher: any }) {
+    if (typeof configOrGetConfig === 'function') {
+      this.getConfigFn = configOrGetConfig;
+    } else if (configOrGetConfig) {
+      this.staticConfig = configOrGetConfig;
+    } else {
+      // Default: use configService
+      this.getConfigFn = () => configService.getConfig();
+    }
+  }
+
   private getConfig() {
-    return configService.getConfig().gallagher;
+    if (this.staticConfig) {
+      return this.staticConfig.gallagher;
+    }
+    return this.getConfigFn().gallagher;
   }
 
   private getBaseUrl(): string {
