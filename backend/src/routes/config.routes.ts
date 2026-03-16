@@ -56,8 +56,8 @@ router.post('/test', internalAuth, async (req: Request, res: Response) => {
         host,
         port: portNum,
         apiKey,
-        strictSsl: !ignoreSsl,
-        ignoreSsl: !!ignoreSsl,
+        strictSsl: false,  // forzar SSL no estricto
+        ignoreSsl: !!ignoreSsl, // usar valor del checkbox
         clientCertThumbprint: currentConfig.gallagher.clientCertThumbprint,
         timeout: 30000,
         // defaultFields no es necesario para el test
