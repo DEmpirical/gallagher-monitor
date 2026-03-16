@@ -4,7 +4,9 @@ import { api } from '@/services/api';
 
 interface Config {
   host: string;
+  port: number;
   strictSsl: boolean;
+  ignoreSsl: boolean;
   timeout: number;
   pollInterval: number;
   defaultFields: string;
@@ -13,7 +15,9 @@ interface Config {
 const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
   const [config, setConfig] = useState<Config>({
     host: '',
+    port: 8904, // puerto por defecto Gallagher
     strictSsl: true,
+    ignoreSsl: false,
     timeout: 30000,
     pollInterval: 15000,
     defaultFields: 'defaults,source,eventType,division,cardholder,priority,occurrences',
@@ -26,7 +30,6 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
   const [message, setMessage] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);
 
-  // Fetch existing config on mount
   useEffect(() => {
     const fetchConfig = async () => {
       try {
@@ -35,7 +38,9 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
         if (data.isConfigured) {
           setConfig({
             host: data.gallagher.host,
+            port: data.gallagher.port,
             strictSsl: data.gallagher.strictSsl,
+            ignoreSsl: data.gallagher.ignoreSsl || false,
             timeout: data.gallagher.timeout,
             pollInterval: data.gallagher.pollInterval,
             defaultFields: data.gallagher.defaultFields,
@@ -43,7 +48,7 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
           setExistingApiKeyMasked(data.gallagher.apiKeyMasked);
         }
       } catch (e) {
-        // ignore if not configured
+        // ignore
       }
     };
     fetchConfig();
@@ -53,7 +58,7 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
     const { name, value, type, checked } = e.target;
     setConfig(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: type === 'checkbox' ? checked : (value === '' ? '' : Number(value) || value),
     }));
     setError(null);
     setMessage(null);
@@ -65,27 +70,17 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
       setError('Host y API Key son obligatorios');
       return;
     }
-    // Validar formato de host como URL
-    try {
-      new URL(config.host);
-    } catch {
-      setError('Host debe ser una URL válida (ej: https://servidor:8443)');
-      return;
-    }
-    // Validar prefijo API Key
-    if (!payloadApiKey.startsWith('GGL-API-KEY')) {
-      setError('API Key debe comenzar con "GGL-API-KEY"');
-      return;
-    }
     setTesting(true);
     setError(null);
     setMessage(null);
     try {
-      const res = await axios.post('/api/config/test', {
+      const payload = {
         host: config.host,
+        port: config.port,
         apiKey: payloadApiKey,
-        strictSsl: config.strictSsl,
-      }, {
+        ignoreSsl: config.ignoreSsl,
+      };
+      const res = await axios.post('/api/config/test', payload, {
         headers: { 'X-Internal-Token': import.meta.env.VITE_INTERNAL_TOKEN },
       });
       if (res.data.success) {
@@ -110,18 +105,6 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
       setError('API Key es obligatoria');
       return;
     }
-    // Validar host URL
-    try {
-      new URL(config.host);
-    } catch {
-      setError('Host debe ser una URL válida (ej: https://servidor:8443)');
-      return;
-    }
-    // Validar API Key formato (si se está cambiando)
-    if (apiKeyInput && !apiKeyInput.startsWith('GGL-API-KEY')) {
-      setError('API Key debe comenzar con "GGL-API-KEY"');
-      return;
-    }
     setLoading(true);
     setError(null);
     setMessage(null);
@@ -129,7 +112,9 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
       const payload: any = {
         gallagher: {
           host: config.host,
+          port: Number(config.port),
           strictSsl: config.strictSsl,
+          ignoreSsl: config.ignoreSsl,
           timeout: Number(config.timeout),
           pollInterval: Number(config.pollInterval),
           defaultFields: config.defaultFields,
@@ -142,7 +127,7 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
         headers: { 'X-Internal-Token': import.meta.env.VITE_INTERNAL_TOKEN },
       });
       setMessage('✅ Configuración guardada');
-      setExistingApiKeyMasked('••••••••••••••••'); // approximate mask
+      setExistingApiKeyMasked('••••••••••••••••');
       setApiKeyInput('');
       setTimeout(() => onSaved(), 1000);
     } catch (e: any) {
@@ -161,19 +146,28 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
         {message && <div className="bg-green-100 text-green-700 p-3 rounded mb-4">{message}</div>}
 
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Host / Base URL</label>
-            <input
-              type="text"
-              name="host"
-              value={config.host}
-              onChange={handleChange}
-              placeholder="https://192.168.1.78:8443"
-              className="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Incluye https:// y puerto si es necesario.
-            </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Host (URL)</label>
+              <input
+                type="text"
+                name="host"
+                value={config.host}
+                onChange={handleChange}
+                placeholder="https://192.168.1.78"
+                className="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Puerto</label>
+              <input
+                type="number"
+                name="port"
+                value={config.port}
+                onChange={handleChange}
+                className="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2"
+              />
+            </div>
           </div>
 
           <div>
@@ -195,12 +189,9 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
               name="apiKey"
               value={apiKeyInput}
               onChange={(e) => setApiKeyInput(e.target.value)}
-              placeholder={existingApiKeyMasked ? 'Dejar vacío para mantener la actual' : 'GGL-API-KEY-...'}
+              placeholder={existingApiKeyMasked ? 'Dejar vacío para mantener la actual' : 'GGL-API-KEY...'}
               className="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Debe comenzar con "GGL-API-KEY". Se almacena encriptada en el backend.
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -211,12 +202,18 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
               onChange={handleChange}
               className="rounded border-gray-300"
             />
-            <label className="text-sm font-medium text-gray-700">
-              Validar certificados HTTPS/TLS
-            </label>
-            <span className="text-xs text-gray-500">
-              (Desactivar para certificados autofirmados)
-            </span>
+            <label className="text-sm font-medium text-gray-700">Validar certificado SSL del servidor</label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              name="ignoreSsl"
+              checked={config.ignoreSsl}
+              onChange={handleChange}
+              className="rounded border-gray-300"
+            />
+            <label className="text-sm font-medium text-gray-700">Ignorar errores de certificado (modo inseguro)</label>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -262,14 +259,14 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
         <div className="mt-6 flex items-center gap-3">
           <button
             onClick={testConnection}
-            disabled={testing || !config.host || (!apiKeyInput && !existingApiKeyMasked)}
+            disabled={testing || !config.host}
             className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50"
           >
             {testing ? 'Probando...' : '🔗 Probar conexión'}
           </button>
           <button
             onClick={saveConfig}
-            disabled={loading || !config.host || (!apiKeyInput && !existingApiKeyMasked)}
+            disabled={loading || !config.host}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
           >
             {loading ? 'Guardando...' : '💾 Guardar configuración'}

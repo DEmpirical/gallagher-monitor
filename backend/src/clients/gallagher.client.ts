@@ -14,6 +14,22 @@ export class GallagherClient {
     return configService.getConfig().gallagher;
   }
 
+  private getBaseUrl(): string {
+    const cfg = this.getConfig();
+    // host ya incluye https:// o http://
+    if (!cfg.host.includes('://')) {
+      throw new Error('Host must include protocol (https:// or http://)');
+    }
+    // Asegurar que no termine con /
+    const cleaned = cfg.host.replace(/\/$/, '');
+    // Agregar puerto si no está ya en la URL
+    const url = new URL(cleaned);
+    if (!url.port) {
+      url.port = String(cfg.port);
+    }
+    return url.toString();
+  }
+
   private getHeaders(): Record<string, string> {
     const cfg = this.getConfig();
     return {
@@ -21,15 +37,6 @@ export class GallagherClient {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
     };
-  }
-
-  private getBaseUrl(): string {
-    const cfg = this.getConfig();
-    return cfg.host.replace(/\/$/, '');
-  }
-
-  private getAgent(): https.Agent {
-    return configService.getHttpsAgent();
   }
 
   private async fetchJson<T>(url: string, init: fetch.RequestInit = {}): Promise<T> {
@@ -40,13 +47,16 @@ export class GallagherClient {
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
+      // Obtener https.Agent si es necesario
+      const agent = this.buildHttpsAgent();
+
       const response = await fetch(fullUrl, {
         ...init,
+        agent,
         headers: {
           ...this.getHeaders(),
           ...(init.headers || {}),
         },
-        agent: this.getAgent(),
         signal: controller.signal,
       });
 
@@ -60,6 +70,44 @@ export class GallagherClient {
     } finally {
       clearTimeout(timeoutId);
     }
+  }
+
+  private buildHttpsAgent(): https.Agent | undefined {
+    const cfg = this.getConfig();
+    const baseUrl = this.getBaseUrl();
+    if (!baseUrl.startsWith('https://')) {
+      return undefined; // HTTP no necesita agent especial
+    }
+
+    const agentOptions: https.RequestOptions = {};
+
+    // 1) Certificado cliente desde store de Windows (solo win32)
+    if (cfg.clientCertThumbprint && process.platform === 'win32') {
+      try {
+        const { Store } = require('win-ca');
+        const store = new Store();
+        const certs = store.findSync({ thumbprint: cfg.clientCertThumbprint });
+        if (certs.length === 0) {
+          throw new Error(`Certificado no encontrado en store: ${cfg.clientCertThumbprint}`);
+        }
+        const cert = certs[0];
+        agentOptions.cert = cert.toPEM();
+        if (cert.privateKey) {
+          agentOptions.key = cert.privateKey.toPEM();
+        } else {
+          logger.warn('Certificado encontrado pero sin clave privada');
+        }
+      } catch (error: any) {
+        logger.error('Error cargando certificado desde Windows store', { error: error.message });
+        // Si falla, continuamos sin certificado (puede que no sea requerido)
+      }
+    }
+
+    // 2) Configurar validación de certificado del servidor
+    const ignore = cfg.ignoreSsl || !cfg.strictSsl;
+    agentOptions.rejectUnauthorized = !ignore;
+
+    return new https.Agent(agentOptions);
   }
 
   private normalizeAlarm(raw: any): AlarmRecord {
