@@ -33,7 +33,7 @@ export class GallagherClient {
   private getHeaders(): Record<string, string> {
     const cfg = this.getConfig();
     return {
-      'Authorization': `Bearer ${cfg.apiKey}`,
+      'Authorization': `GGL-API-KEY ${cfg.apiKey}`,
       'Accept': 'application/json',
       'Content-Type': 'application/json',
     };
