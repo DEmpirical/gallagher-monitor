@@ -24,7 +24,7 @@ app.use(express.json());
 app.use('/api/alarms', internalAuth, alarmsRouter);
 app.use('/api/events', internalAuth, eventsRouter);
 app.use('/api/config', configRouter);
-app.use('/health', healthRouter);
+app.use('/api/health', healthRouter);
 
 // Error handling
 app.use(errorHandler);
