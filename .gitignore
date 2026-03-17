@@ -31,6 +31,7 @@ Thumbs.db
 *.crt
 *.key
 *.pem
+certs/
 
 # Backend config (runtime)
 config.json
