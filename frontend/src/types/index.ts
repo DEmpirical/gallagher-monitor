@@ -52,6 +52,8 @@ export interface FilterState {
 export interface Config {
   host: string;
   port: number;
+  strictSsl: boolean;
+  ignoreSsl: boolean;
   timeout: number;
   pollInterval: number;
   defaultFields: string;

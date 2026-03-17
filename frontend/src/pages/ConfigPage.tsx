@@ -5,6 +5,8 @@ import { api } from '@/services/api';
 interface Config {
   host: string;
   port: number;
+  strictSsl: boolean;
+  ignoreSsl: boolean;
   timeout: number;
   pollInterval: number;
   defaultFields: string;
@@ -14,6 +16,8 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
   const [config, setConfig] = useState<Config>({
     host: '',
     port: 8904,
+    strictSsl: true,
+    ignoreSsl: false,
     timeout: 30000,
     pollInterval: 15000,
     defaultFields: 'defaults,source,eventType,division,cardholder,priority,occurrences',
@@ -35,6 +39,8 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
           setConfig({
             host: data.gallagher.host,
             port: data.gallagher.port,
+            strictSsl: data.gallagher.strictSsl,
+            ignoreSsl: data.gallagher.ignoreSsl || false,
             timeout: data.gallagher.timeout,
             pollInterval: data.gallagher.pollInterval,
             defaultFields: data.gallagher.defaultFields,
@@ -49,10 +55,10 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setConfig(prev => ({
       ...prev,
-      [name]: value === '' ? '' : Number(value) || value,
+      [name]: type === 'checkbox' ? checked : (value === '' ? '' : Number(value) || value),
     }));
     setError(null);
     setMessage(null);
@@ -72,6 +78,7 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
         host: config.host,
         port: config.port,
         apiKey: payloadApiKey,
+        ignoreSsl: config.ignoreSsl,
       };
       const res = await axios.post('/api/config/test', payload, {
         headers: { 'X-Internal-Token': import.meta.env.VITE_INTERNAL_TOKEN },
@@ -106,6 +113,8 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
         gallagher: {
           host: config.host,
           port: Number(config.port),
+          strictSsl: config.strictSsl,
+          ignoreSsl: config.ignoreSsl,
           timeout: Number(config.timeout),
           pollInterval: Number(config.pollInterval),
           defaultFields: config.defaultFields,
@@ -183,6 +192,28 @@ const ConfigPage = ({ onSaved }: { onSaved: () => void }) => {
               placeholder={existingApiKeyMasked ? 'Dejar vacío para mantener la actual' : 'GGL-API-KEY...'}
               className="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2"
             />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              name="strictSsl"
+              checked={config.strictSsl}
+              onChange={handleChange}
+              className="rounded border-gray-300"
+            />
+            <label className="text-sm font-medium text-gray-700">Validar certificado SSL del servidor</label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              name="ignoreSsl"
+              checked={config.ignoreSsl}
+              onChange={handleChange}
+              className="rounded border-gray-300"
+            />
+            <label className="text-sm font-medium text-gray-700">Ignorar errores de certificado (modo inseguro)</label>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
