@@ -175,6 +175,10 @@ class ConfigService {
   }
 
   isConfigured(): boolean {
+    // Solo si existe config.json y tiene valores mínimos
+    if (!fs.existsSync(this.configPath)) {
+      return false;
+    }
     return !!(this.config.gallagher.host && this.config.gallagher.apiKey && this.config.gallagher.port);
   }
 
