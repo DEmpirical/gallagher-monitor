@@ -139,11 +139,10 @@ export class GallagherClient {
     // 2) Configurar validación de certificado del servidor
     const ignore = cfg.ignoreSsl || !cfg.strictSsl;
     agentOptions.rejectUnauthorized = !ignore;
-    logger.debug('Agent options', { 
-      rejectUnauthorized: agentOptions.rejectUnauthorized, 
-      ignore: ignore,
-      strictSsl: cfg.strictSsl,
-      ignoreSsl: cfg.ignoreSsl
+    logger.debug('Final agent options', { 
+      hasCert: !!agentOptions.cert || !!agentOptions.pfx,
+      hasKey: !!agentOptions.key,
+      rejectUnauthorized: agentOptions.rejectUnauthorized,
     });
 
     return new https.Agent(agentOptions);
