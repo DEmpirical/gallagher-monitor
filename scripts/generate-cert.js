@@ -15,7 +15,7 @@ const keyPath = path.join(certsDir, 'client.key');
 const csrPath = path.join(certsDir, 'client.csr');
 const crtPath = path.join(certsDir, 'client.crt');
 const pfxPath = path.join(certsDir, 'client.pfx');
-const password = 'MiPassword123';
+const password = '123456'; // Contraseña simple para el PFX
 
 console.log('Generando certificado cliente para Gallagher...');
 
