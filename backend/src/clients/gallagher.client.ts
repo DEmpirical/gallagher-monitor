@@ -1,5 +1,7 @@
 import fetch from 'node-fetch';
 import https from 'https';
+import * as fs from 'fs';
+import * as path from 'path';
 import { configService } from '../services/config.service';
 import {
   GallagherAlarmResponse,
@@ -10,7 +12,8 @@ import {
 import { logger } from '../utils/logger';
 
 export class GallagherClient {
-  private getConfigFn?: () => { gallagher: any };
+  // Soporte para inyectar config (para tests) o usar configService por defecto
+  private getConfigFn: () => { gallagher: any };
   private staticConfig: { gallagher: any } | null = null;
 
   constructor(configOrGetConfig?: (() => { gallagher: any }) | { gallagher: any }) {
@@ -19,7 +22,7 @@ export class GallagherClient {
     } else if (configOrGetConfig) {
       this.staticConfig = configOrGetConfig;
     } else {
-      // Default: use configService
+      // Default: usar configService
       this.getConfigFn = () => configService.getConfig();
     }
   }
@@ -48,6 +51,7 @@ export class GallagherClient {
     return url.toString();
   }
 
+<<<<<<< HEAD
   private getHeaders(): Record<string, string> {
     const cfg = this.getConfig();
     return {
@@ -90,11 +94,15 @@ export class GallagherClient {
     }
   }
 
+=======
+>>>>>>> origin/main
   private buildHttpsAgent(): https.Agent | undefined {
+    // BIZARROCORP: usando .pfx en lugar de win-ca store
     const cfg = this.getConfig();
     const baseUrl = this.getBaseUrl();
     if (!baseUrl.startsWith('https://')) {
-      return undefined; // HTTP no necesita agent especial
+      logger.debug('buildHttpsAgent: not HTTPS, returning undefined');
+      return undefined;
     }
 
     const agentOptions: https.AgentOptions = {};
@@ -106,9 +114,10 @@ export class GallagherClient {
       platform: process.platform
     });
 
-    // 1) Certificado cliente desde store de Windows (solo win32)
+    // 1) Certificado cliente desde .pfx (Windows)
     if (cfg.clientCertThumbprint && process.platform === 'win32') {
       try {
+<<<<<<< HEAD
         const winCa = require('win-ca');
         // win-ca API: findSync({ thumbprint }) o find({ thumbprint })
         const certs = winCa.findSync ? winCa.findSync({ thumbprint: cfg.clientCertThumbprint }) : winCa.find({ thumbprint: cfg.clientCertThumbprint });
@@ -119,35 +128,51 @@ export class GallagherClient {
         });
         if (certs.length === 0) {
           throw new Error(`Certificado no encontrado en store: ${cfg.clientCertThumbprint}`);
+=======
+        // Buscar .pfx en ubicaciones conocidas
+        const possiblePaths = [
+          path.resolve(process.cwd(), 'certs', 'client.pfx'),
+          path.resolve(process.cwd(), 'cert2', 'client.pfx'),
+          process.env.GALLAGHER_CLIENT_PFX_PATH,
+        ].filter(Boolean);
+        let pfxPath: string | null = null;
+        for (const p of possiblePaths) {
+          if (p && fs.existsSync(p)) {
+            pfxPath = p;
+            break;
+          }
+>>>>>>> origin/main
         }
-        const cert = certs[0];
-        agentOptions.cert = cert.toPEM();
-        if (cert.privateKey) {
-          agentOptions.key = cert.privateKey.toPEM();
-          logger.debug('Client certificate loaded with private key', { subject: cert.subject });
+        if (!pfxPath) {
+          logger.warn('clientCertThumbprint configurado pero no se encontró archivo .pfx en certs/ o cert2/. Se omitirá el certificado cliente.');
         } else {
-          logger.warn('Certificado encontrado pero sin clave privada');
+          const passphrase = process.env.GALLAGHER_CLIENT_PFX_PASS || '123456';
+          const pfxData = fs.readFileSync(pfxPath);
+          agentOptions.pfx = pfxData;
+          agentOptions.passphrase = passphrase;
+          logger.info('Certificado cliente cargado desde PFX', { path: pfxPath, thumbprint: cfg.clientCertThumbprint });
         }
       } catch (error: any) {
-        logger.error('Error cargando certificado desde Windows store', { error: error.message, stack: error.stack });
-        // Si falla, continuamos sin certificado (puede que no sea requerido)
+        logger.error('Error cargando certificado cliente desde PFX', { error: error.message, stack: error.stack });
+        // Continuar sin certificado
       }
     } else if (cfg.clientCertThumbprint) {
-      logger.warn('clientCertThumbprint set but not on Windows (platform=' + process.platform + ')');
+      logger.warn('clientCertThumbprint configurado pero no estamos en Windows (platform=' + process.platform + ')');
     }
 
     // 2) Configurar validación de certificado del servidor
     const ignore = cfg.ignoreSsl || !cfg.strictSsl;
     agentOptions.rejectUnauthorized = !ignore;
-    logger.debug('Final agent options', { 
-      hasCert: !!agentOptions.cert || !!agentOptions.pfx,
-      hasKey: !!agentOptions.key,
+logger.debug('Final agent options', { 
+      hasPfx: !!agentOptions.pfx,
+      hasPassphrase: !!agentOptions.passphrase,
       rejectUnauthorized: agentOptions.rejectUnauthorized,
     });
 
     return new https.Agent(agentOptions);
   }
 
+<<<<<<< HEAD
   private normalizeAlarm(raw: any): AlarmRecord {
     return {
       id: raw.id,
@@ -252,31 +277,77 @@ export class GallagherClient {
   }
 
   async getEvents(params: Record<string, any> = {}): Promise<{ events: EventRecord[]; nextHref?: string }> {
+=======
+  private async fetchJson(url: string, method: string = 'GET', body?: any): Promise<any> {
+>>>>>>> origin/main
     const cfg = this.getConfig();
-    const qs = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '') {
-        qs.append(k, String(v));
-      }
-    });
-    if (!params.fields) {
-      qs.append('fields', cfg.defaultFields);
+    const baseUrl = this.getBaseUrl();
+    const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
+    const agent = this.buildHttpsAgent();
+
+    const options: https.RequestOptions = {
+      method,
+      agent,
+      headers: this.getHeaders(),
+      // timeout? cfg.timeout
+    };
+
+    if (body) {
+      options.body = JSON.stringify(body);
     }
-    const query = qs.toString() ? `?${qs}` : '';
-    const data = await this.fetchJson<GallagherEventResponse>(`/api/events${query}`);
-    const normalized = (data?.events || []).map(e => this.normalizeEvent(e));
-    return { events: normalized, nextHref: data?._links?.next?.href };
+
+    const response = await fetch(fullUrl, options);
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Gallagher API error ${response.status}: ${response.statusText} - ${text}`);
+    }
+    return response.json();
   }
 
-  async getEventUpdates(url: string): Promise<{ events: EventRecord[]; nextHref?: string }> {
-    const data = await this.fetchJson<GallagherEventResponse>(url);
-    const normalized = (data?.events || []).map(e => this.normalizeEvent(e));
-    return { events: normalized, nextHref: data?._links?.next?.href };
+  private getHeaders(): Record<string, string> {
+    const cfg = this.getConfig();
+    return {
+      'Authorization': `GGL-API-KEY ${cfg.apiKey}`,
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
   }
 
-  async getApiRoot(): Promise<{ _links: Record<string, { href: string }> }> {
+  async getApiRoot() {
     return this.fetchJson('/api');
   }
-}
 
-export const gallagherClient = new GallagherClient();
+  async getEvents(params?: { limit?: number; after?: string; before?: string; fields?: string }): Promise<GallagherEventResponse> {
+    const query = new URLSearchParams();
+    if (params?.limit) query.append('limit', String(params.limit));
+    if (params?.after) query.append('after', params.after);
+    if (params?.before) query.append('before', params.before);
+    if (params?.fields) query.append('fields', params.fields);
+    const queryString = query.toString();
+    const url = queryString ? `/api/events?${queryString}` : '/api/events';
+    return this.fetchJson(url) as Promise<GallagherEventResponse>;
+  }
+
+  async getAlarms(params?: { limit?: number; after?: string; before?: string }): Promise<GallagherAlarmResponse> {
+    const query = new URLSearchParams();
+    if (params?.limit) query.append('limit', String(params.limit));
+    if (params?.after) query.append('after', params.after);
+    if (params?.before) query.append('before', params.before);
+    const queryString = query.toString();
+    const url = queryString ? `/api/alarms?${queryString}` : '/api/alarms';
+    return this.fetchJson(url) as Promise<GallagherAlarmResponse>;
+  }
+
+  async acknowledgeAlarm(alarmId: string) {
+    return this.fetchJson(`/api/alarms/${alarmId}/acknowledge`, 'POST');
+  }
+
+  async clearAlarm(alarmId: string) {
+    return this.fetchJson(`/api/alarms/${alarmId}/clear`, 'POST');
+  }
+
+  async getUpdates(params?: { timeout?: number }) {
+    // Long-poll updates endpoint
+    return this.fetchJson('/api/events/updates', 'GET');
+  }
+}
