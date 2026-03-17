@@ -49,7 +49,7 @@ class ConfigService {
       return undefined;
     }
 
-    const agentOptions: https.RequestOptions = {};
+    const agentOptions: https.AgentOptions = {};
 
     // Certificado cliente desde store de Windows (solo win32)
     if (cfg.clientCertThumbprint && process.platform === 'win32') {

@@ -10,7 +10,7 @@ import {
 import { logger } from '../utils/logger';
 
 export class GallagherClient {
-  private getConfigFn: () => { gallagher: any };
+  private getConfigFn?: () => { gallagher: any };
   private staticConfig: { gallagher: any } | null = null;
 
   constructor(configOrGetConfig?: (() => { gallagher: any }) | { gallagher: any }) {
@@ -28,7 +28,7 @@ export class GallagherClient {
     if (this.staticConfig) {
       return this.staticConfig.gallagher;
     }
-    return this.getConfigFn().gallagher;
+    return this.getConfigFn!().gallagher;
   }
 
   private getBaseUrl(): string {
@@ -57,7 +57,7 @@ export class GallagherClient {
     };
   }
 
-  private async fetchJson<T>(url: string, init: fetch.RequestInit = {}): Promise<T> {
+  private async fetchJson<T>(url: string, init: any = {}): Promise<T> {
     const baseUrl = this.getBaseUrl();
     const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
     const controller = new AbortController();
@@ -65,7 +65,6 @@ export class GallagherClient {
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      // Obtener https.Agent si es necesario
       const agent = this.buildHttpsAgent();
 
       const response = await fetch(fullUrl, {
@@ -83,8 +82,9 @@ export class GallagherClient {
         throw new Error(`Gallagher API error ${response.status}: ${response.statusText} - ${text}`);
       }
 
-      if (response.status === 204) return null as any;
-      return response.json();
+      if (response.status === 204) return null as unknown as T;
+      const data = await response.json();
+      return data as T;
     } finally {
       clearTimeout(timeoutId);
     }
@@ -97,7 +97,7 @@ export class GallagherClient {
       return undefined; // HTTP no necesita agent especial
     }
 
-    const agentOptions: https.RequestOptions = {};
+    const agentOptions: https.AgentOptions = {};
     logger.debug('Building HTTPS agent', { 
       host: baseUrl, 
       ignoreSsl: cfg.ignoreSsl, 
@@ -115,7 +115,7 @@ export class GallagherClient {
         logger.info('Certificates found in Windows Store', { 
           requestedThumbprint: cfg.clientCertThumbprint,
           foundCount: certs.length,
-          foundThumbprints: certs.map(c => c.thumbprint)
+          foundThumbprints: certs.map((c: any) => c.thumbprint)
         });
         if (certs.length === 0) {
           throw new Error(`Certificado no encontrado en store: ${cfg.clientCertThumbprint}`);
@@ -217,6 +217,18 @@ export class GallagherClient {
       location: raw.location,
       raw,
     };
+  }
+
+  async getCardHolders(params?: { search?: string; limit?: number; offset?: number }): Promise<{ cardholders: any[]; nextHref?: string }> {
+    const qs = new URLSearchParams();
+    if (params) {
+      if (params.search) qs.append('search', params.search);
+      if (params.limit) qs.append('limit', String(params.limit));
+      if (params.offset) qs.append('offset', String(params.offset));
+    }
+    const query = qs.toString() ? `?${qs}` : '';
+    const data = await this.fetchJson<any>(`/api/cardholders${query}`);
+    return { cardholders: data?.cardholders || [], nextHref: data?._links?.next?.href };
   }
 
   async getAlarms(): Promise<{ alarms: AlarmRecord[]; nextHref?: string }> {

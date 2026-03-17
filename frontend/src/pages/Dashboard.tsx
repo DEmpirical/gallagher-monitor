@@ -9,8 +9,8 @@ type Tab = 'alarms' | 'events';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<Tab>('alarms');
-  const { alarms, loading: alarmsLoading, error: alarmsError, acknowledge, clear } = useGallagherAlarms();
-  const { events, loading: eventsLoading, error: eventsError } = useGallagherEvents();
+  const { alarms, error: alarmsError, acknowledge, clear } = useGallagherAlarms();
+  const { events, error: eventsError } = useGallagherEvents();
 
   return (
     <Layout live>

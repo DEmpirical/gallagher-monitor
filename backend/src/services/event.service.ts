@@ -42,7 +42,7 @@ export class EventService {
 
     // Gallagher supported filters from documentation
     if (filters.group) params.group = filters.group;
-    if (filters.type) params.type = filters.type;
+    if (filters.eventType) params.type = filters.eventType;
     if (filters.cardholder) params.cardholder = filters.cardholder;
     if (filters.division) params.division = filters.division;
     if (filters.directDivision) params.directDivision = filters.directDivision;
