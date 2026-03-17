@@ -144,16 +144,18 @@ class ConfigService {
   }
 
   private validateApiKey(apiKey: string) {
-    if (!apiKey.startsWith('GGL-API-KEY')) {
-      throw new Error('API Key must start with "GGL-API-KEY"');
+    if (!apiKey || apiKey.trim() === '') {
+      throw new Error('API Key cannot be empty');
     }
   }
 
   private validateHost(host: string) {
     try {
-      new URL(host);
+      // Si no incluye protocolo, agregar https:// para validación
+      const url = host.includes('://') ? host : `https://${host}`;
+      new URL(url);
     } catch {
-      throw new Error('Host must be a valid URL (include https://)');
+      throw new Error('Host debe ser una URL válida (ej: https://servidor:8443) o un hostname (ej: servidor)');
     }
   }
 

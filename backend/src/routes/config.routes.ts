@@ -31,9 +31,9 @@ router.post('/test', internalAuth, async (req: Request, res: Response) => {
     return res.status(400).json({ success: false, error: 'Host, puerto y API Key son requeridos' });
   }
   try {
-    // Validar formato de API key
-    if (!apiKey.startsWith('GGL-API-KEY')) {
-      return res.status(400).json({ success: false, error: 'API Key debe comenzar con "GGL-API-KEY"' });
+    // Validar que API key no esté vacío
+    if (!apiKey || apiKey.trim() === '') {
+      return res.status(400).json({ success: false, error: 'API Key es requerida' });
     }
     // Validar host como URL
     try {

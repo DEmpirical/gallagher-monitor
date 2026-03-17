@@ -33,12 +33,13 @@ export class GallagherClient {
 
   private getBaseUrl(): string {
     const cfg = this.getConfig();
-    // host ya incluye https:// o http://
-    if (!cfg.host.includes('://')) {
-      throw new Error('Host must include protocol (https:// or http://)');
+    // host puede incluir o no protocolo; si no lo incluye, agregar https://
+    let host = cfg.host;
+    if (!host.includes('://')) {
+      host = `https://${host}`;
     }
     // Asegurar que no termine con /
-    const cleaned = cfg.host.replace(/\/$/, '');
+    const cleaned = host.replace(/\/$/, '');
     // Agregar puerto si no está ya en la URL
     const url = new URL(cleaned);
     if (!url.port) {
