@@ -81,6 +81,15 @@ class ConfigService {
 
   private load(): AppConfig {
     try {
+      const env = process.env;
+      logger.info('Environment variables relevant to config:', {
+        GALLAGHER_HOST: env.GALLAGHER_HOST,
+        GALLAGHER_PORT: env.GALLAGHER_PORT,
+        GALLAGHER_API_KEY: env.GALLAGHER_API_KEY ? '***' : undefined,
+        GALLAGHER_CLIENT_CERT_THUMBPRINT: env.GALLAGHER_CLIENT_CERT_THUMBPRINT,
+        GALLAGHER_IGNORE_SERVER_CERT: env.GALLAGHER_IGNORE_SERVER_CERT,
+        CONFIG_PATH: this.configPath,
+      });
       // Fusionar defaults, .env, y config.json
       const merged: any = { ...DEFAULT_CONFIG };
 
@@ -89,6 +98,9 @@ class ConfigService {
         const raw = fs.readFileSync(this.configPath, 'utf8');
         const parsed = JSON.parse(raw);
         merged.gallagher = { ...DEFAULT_CONFIG.gallagher, ...parsed.gallagher };
+        logger.info('Loaded config from config.json', { config: merged });
+      } else {
+        logger.warn('config.json not found, using .env and defaults');
       }
 
       // 2) Aplicar variables de entorno como overrides (para desarrollo)
@@ -102,6 +114,7 @@ class ConfigService {
       if (process.env.GALLAGHER_POLL_INTERVAL) merged.gallagher.pollInterval = parseInt(process.env.GALLAGHER_POLL_INTERVAL, 10);
       if (process.env.GALLAGHER_DEFAULT_FIELDS) merged.gallagher.defaultFields = process.env.GALLAGHER_DEFAULT_FIELDS;
 
+      logger.info('Final effective config', { config: merged });
       return merged as AppConfig;
     } catch (error: any) {
       logger.error('Failed to load config', { error: error.message });
