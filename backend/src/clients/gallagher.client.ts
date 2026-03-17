@@ -109,8 +109,8 @@ export class GallagherClient {
     // 1) Certificado cliente desde store de Windows (solo win32)
     if (cfg.clientCertThumbprint && process.platform === 'win32') {
       try {
-        const { Store } = require('win-ca');
-        const store = new Store();
+        const winCa = require('win-ca');
+        const store = new winCa.Store();
         const certs = store.findSync({ thumbprint: cfg.clientCertThumbprint });
         logger.info('Certificates found in Windows Store', { 
           requestedThumbprint: cfg.clientCertThumbprint,
