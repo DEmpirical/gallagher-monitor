@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
 import ConfigPage from '@/pages/ConfigPage';
 import Dashboard from '@/pages/Dashboard';
+import CardholdersPage from '@/pages/CardholdersPage';
 import { api } from '@/services/api';
+
+type Page = 'dashboard' | 'cardholders';
 
 function App() {
   const [configured, setConfigured] = useState<boolean | null>(null);
+  const [page, setPage] = useState<Page>('dashboard');
 
   useEffect(() => {
     const checkConfig = async () => {
@@ -30,7 +34,17 @@ function App() {
     return <ConfigPage onSaved={() => setConfigured(true)} />;
   }
 
-  return <Dashboard />;
+  return (
+    <div>
+      {/* Navbar simple */}
+      <nav className="bg-gray-800 text-white p-2 flex gap-4">
+        <button onClick={() => setPage('dashboard')} className={`hover:underline ${page === 'dashboard' ? 'font-bold' : ''}`}>Dashboard</button>
+        <button onClick={() => setPage('cardholders')} className={`hover:underline ${page === 'cardholders' ? 'font-bold' : ''}`}>Cardholders</button>
+      </nav>
+      {page === 'dashboard' && <Dashboard />}
+      {page === 'cardholders' && <CardholdersPage />}
+    </div>
+  );
 }
 
 export default App;
