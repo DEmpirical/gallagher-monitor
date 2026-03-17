@@ -6,6 +6,7 @@ import { alarmsRouter } from './routes/alarms.routes';
 import { eventsRouter } from './routes/events.routes';
 import { configRouter } from './routes/config.routes';
 import { healthRouter } from './routes/health.routes';
+import { cardholdersRouter } from './routes/cardholders.routes';
 import { internalAuth } from './middleware/auth';
 import { errorHandler } from './middleware/error-handler';
 
@@ -24,6 +25,7 @@ app.use(express.json());
 app.use('/api/alarms', internalAuth, alarmsRouter);
 app.use('/api/events', internalAuth, eventsRouter);
 app.use('/api/config', configRouter);
+app.use('/api/cardholders', internalAuth, cardholdersRouter);
 app.use('/api/health', healthRouter);
 
 // Error handling
