@@ -6,7 +6,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const certsDir = path.resolve(process.cwd(), 'certs');
+const certsDir = path.resolve(process.cwd(), 'cert2');
 if (!fs.existsSync(certsDir)) {
   fs.mkdirSync(certsDir, { recursive: true });
 }
