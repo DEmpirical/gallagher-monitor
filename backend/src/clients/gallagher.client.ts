@@ -112,6 +112,11 @@ export class GallagherClient {
         const { Store } = require('win-ca');
         const store = new Store();
         const certs = store.findSync({ thumbprint: cfg.clientCertThumbprint });
+        logger.info('Certificates found in Windows Store', { 
+          requestedThumbprint: cfg.clientCertThumbprint,
+          foundCount: certs.length,
+          foundThumbprints: certs.map(c => c.thumbprint)
+        });
         if (certs.length === 0) {
           throw new Error(`Certificado no encontrado en store: ${cfg.clientCertThumbprint}`);
         }
@@ -119,14 +124,16 @@ export class GallagherClient {
         agentOptions.cert = cert.toPEM();
         if (cert.privateKey) {
           agentOptions.key = cert.privateKey.toPEM();
+          logger.debug('Client certificate loaded with private key', { subject: cert.subject });
         } else {
           logger.warn('Certificado encontrado pero sin clave privada');
         }
-        logger.debug('Client certificate loaded', { subject: cert.subject });
       } catch (error: any) {
-        logger.error('Error cargando certificado desde Windows store', { error: error.message });
+        logger.error('Error cargando certificado desde Windows store', { error: error.message, stack: error.stack });
         // Si falla, continuamos sin certificado (puede que no sea requerido)
       }
+    } else if (cfg.clientCertThumbprint) {
+      logger.warn('clientCertThumbprint set but not on Windows (platform=' + process.platform + ')');
     }
 
     // 2) Configurar validación de certificado del servidor
