@@ -42,3 +42,4 @@ config.json
 coverage/
 .nyc_output/
 
+/cert2
