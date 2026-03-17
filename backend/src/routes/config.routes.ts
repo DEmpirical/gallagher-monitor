@@ -35,11 +35,12 @@ router.post('/test', internalAuth, async (req: Request, res: Response) => {
     if (!apiKey || apiKey.trim() === '') {
       return res.status(400).json({ success: false, error: 'API Key es requerida' });
     }
-    // Validar host como URL
+    // Validar host (acepta hostname sin protocolo)
     try {
-      new URL(host);
+      const url = host.includes('://') ? host : `https://${host}`;
+      new URL(url);
     } catch {
-      return res.status(400).json({ success: false, error: 'Host debe ser una URL válida (ej: https://servidor:8443)' });
+      return res.status(400).json({ success: false, error: 'Host debe ser una URL válida (ej: https://servidor:8443) o un hostname (ej: servidor)' });
     }
     // Validar puerto numérico
     const portNum = parseInt(port);
